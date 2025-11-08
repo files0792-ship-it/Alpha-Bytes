@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI Task Assistant • Weekly Schedule • Voice Add</title>
+<style>
+  :root{
+    --bg:#0f1220; --panel:#161a2b; --muted:#8a90b0; --text:#e9ecff;
+    --hi:#ff4d4f; --med:#ffcc00; --low:#2ecc71; --accent:#7c5cff;
+    --card:#1b2036; --line:#242a44; --slot:#0d1330; --slotline:#2a335e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; font-family:Inter,system-ui,Segoe UI,Arial; background:var(--bg); color:var(--text)}
+  header{padding:18px 24px; border-bottom:1px solid var(--line); position:sticky; top:0; background:rgba(15,18,32,.9); backdrop-filter:blur(6px); z-index:10}
+  h1{margin:0; font-size:22px; letter-spacing:.3px}
+  .wrap{max-width:1280px; margin:0 auto; padding:20px}
+  .grid{display:grid; grid-template-columns: 380px 1fr 440px; gap:18px}
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px}
+  .panel h3{margin:4px 0 14px 0; font-size:16px}
+  label{display:block; font-size:12px; color:var(--muted); margin:8px 0 6px}
+  input, select, button{width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:#0e1324; color:var(--text); outline:none}
+  input[type="date"], input[type="time"]{color-scheme:dark}
+  button{background:var(--accent); border:none; cursor:pointer; font-weight:600}
+  button.secondary{background:#0e1324; border:1px solid var(--line)}
+  .row{display:flex; gap:10px}
+  .btn-row{display:flex; gap:8px; margin-top:8px}
+
+  /* Board */
+  .board{display:grid; grid-template-columns: repeat(3,1fr); gap:12px}
+  .col{background:var(--card); border:1px dashed #2b3153; border-radius:12px; padding:10px; min-height:220px}
+  .col h4{margin:0 0 8px 0; font-size:13px; color:var(--muted); letter-spacing:.3px}
+  .task{background:#121832; border:1px solid #262d52; border-radius:10px; padding:10px; margin:8px 0; cursor:grab}
+  .task:active{cursor:grabbing}
+  .title{font-weight:600; font-size:14px; margin-bottom:6px}
+  .meta{display:flex; gap:8px; flex-wrap:wrap; font-size:12px; color:#c9cff9}
+  .pill{padding:2px 8px; border-radius:999px; border:1px solid #2a2f55; background:#0d1330}
+  .urg-high{background:rgba(255,77,79,.12); border-color:rgba(255,77,79,.35); color:#ffb3b4}
+  .urg-medium{background:rgba(255,204,0,.12); border-color:rgba(255,204,0,.35); color:#ffe08a}
+  .urg-low{background:rgba(46,204,113,.12); border-color:rgba(46,204,113,.35); color:#b8f6cf}
+  .task .actions{margin-top:8px; display:flex; gap:8px}
+  .task .actions button{padding:6px 8px; font-size:12px; border-radius:8px}
+  .danger{background:#2a1330; border:1px solid #51214f}
+
+  /* Priority */
+  .priority{display:flex; flex-direction:column; gap:8px; max-height:360px; overflow:auto; padding-right:4px}
+  .prio{display:flex; align-items:center; justify-content:space-between; gap:12px; background:#121832; border:1px solid #262d52; border-radius:10px; padding:8px 10px}
+  .rank{width:26px; height:26px; display:grid; place-items:center; border-radius:7px; background:#0d1330; color:#bfc5f5; font-weight:700}
+
+  /* Chat */
+  .chat{display:flex; flex-direction:column; height:520px}
+  .log{flex:1; border:1px solid var(--line); border-radius:10px; padding:10px; background:#0d1330; overflow:auto}
+  .bubble{max-width:85%; padding:10px 12px; border-radius:12px; margin:6px 0; line-height:1.3}
+  .user{background:#233057; margin-left:auto}
+  .ai{background:#182046; border:1px solid #2a335e}
+  .composer{display:flex; gap:8px; margin-top:8px}
+  .composer input{flex:1}
+  #mic{width:auto; padding:10px 12px; background:#0e1324; border:1px solid var(--line); cursor:pointer}
+  #mic.on{background:#1e2a58; border-color:#4a5bd1; box-shadow:0 0 0 2px rgba(124,92,255,.25) inset}
+
+  /* Weekly schedule */
+  .sched-toolbar{display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap}
+  .sched-grid{display:grid; grid-template-columns: 80px repeat(7, 1fr); grid-auto-rows: 48px; gap:4px; border:1px solid var(--line); border-radius:10px; padding:6px; background:#0b1024}
+  .sched-header{font-size:12px; color:#c8cdf7; text-align:center; padding:6px 4px}
+  .sched-hour{font-size:12px; color:#8ea0ff; display:grid; place-items:center}
+  .slot{background:var(--slot); border:1px solid var(--slotline); border-radius:8px; position:relative; overflow:hidden}
+  .slot .badge{position:absolute; inset:4px 6px auto 6px; font-size:11px; color:#d6dbff; opacity:.9}
+  .slot.fill-high{background:rgba(255,77,79,.18); border-color:rgba(255,77,79,.45)}
+  .slot.fill-medium{background:rgba(255,204,0,.18); border-color:rgba(255,204,0,.45)}
+  .slot.fill-low{background:rgba(46,204,113,.18); border-color:rgba(46,204,113,.45)}
+  .slot.fixed{outline:2px solid #59a8ff}
+</style>
+</head>
+<body>
+<header><h1>AI Task Prioritization Assistant</h1></header>
+
+<div class="wrap">
+  <div class="grid">
+    <!-- Left: task form -->
+    <div class="panel">
+      <h3>Add a Task</h3>
+      <label>Task name</label>
+      <input id="name" placeholder="e.g., Study for exams" />
+      <div class="row">
+        <div style="flex:1">
+          <label>Urgency</label>
+          <select id="urgency"><option>High</option><option>Medium</option><option>Low</option></select>
+        </div>
+        <div style="flex:1">
+          <label>Deadline</label>
+          <input type="date" id="deadline" />
+        </div>
+      </div>
+      <div class="row">
+        <div style="flex:1">
+          <label>Estimated time (hours)</label>
+          <input id="eta" type="number" min="0" step="0.5" placeholder="e.g., 2" />
+        </div>
+        <div style="flex:1">
+          <label>Task Type</label>
+          <select id="type"><option>Flexible</option><option>Fixed</option></select>
+        </div>
+      </div>
+      <div id="fixedFields">
+        <div class="row">
+          <div style="flex:1">
+            <label>Fixed Date (exact day)</label>
+            <input type="date" id="fixedDate" />
+          </div>
+          <div style="flex:1">
+            <label>Fixed Start Time</label>
+            <input type="time" id="fixedStart" value="10:00" />
+          </div>
+        </div>
+        <div class="row">
+          <div style="flex:1">
+            <label>Fixed Duration (hours)</label>
+            <input id="fixedDuration" type="number" min="0.5" step="0.5" placeholder="e.g., 1" />
+          </div>
+          <div style="flex:1; display:flex; align-items:flex-end">
+            <button id="addTask">Add Task</button>
+          </div>
+        </div>
+      </div>
+
+      <h3 style="margin-top:18px">Prioritized (Top 3)</h3>
+      <div id="priorityTop" class="priority"></div>
+      <div class="btn-row">
+        <button class="secondary" id="clearDone">Clear Done</button>
+        <button class="secondary" id="resetDemo">Reset Demo Data</button>
+      </div>
+    </div>
+
+    <!-- Center: board + full priority -->
+    <div class="panel">
+      <h3>Task Board</h3>
+      <div class="board">
+        <div class="col" data-status="Not Started"><h4>Not Started</h4><div id="col-notstarted" class="dropzone"></div></div>
+        <div class="col" data-status="In Progress"><h4>In Progress</h4><div id="col-inprogress" class="dropzone"></div></div>
+        <div class="col" data-status="Done"><h4>Done</h4><div id="col-done" class="dropzone"></div></div>
+      </div>
+      <h3 style="margin-top:18px">Full Prioritization</h3>
+      <div id="priorityFull" class="priority"></div>
+    </div>
+
+    <!-- Right: assistant + weekly schedule -->
+    <div class="panel">
+      <h3>Assistant</h3>
+      <div class="btn-row">
+        <button id="btnNext">What should I do next?</button>
+        <button class="secondary" id="btnUrgent">Show urgent tasks</button>
+      </div>
+      <div class="chat" style="margin-top:8px">
+        <div id="chatLog" class="log"></div>
+        <div class="composer">
+          <input id="chatInput" placeholder="Ask me: What's due today?" />
+          <button id="mic" title="Voice">🎤</button>
+          <button id="send">Send</button>
+        </div>
+      </div>
+
+      <h3 style="margin-top:16px">Weekly Schedule</h3>
+      <div class="sched-toolbar">
+        <div class="row" style="align-items:center">
+          <div style="flex:1">
+            <label>Pick any date in the week</label>
+            <input id="weekDate" type="date" />
+          </div>
+        </div>
+        <div class="row" style="align-items:center">
+          <div style="flex:1">
+            <label>Wake time</label>
+            <input id="wakeTime" type="time" value="07:00" />
+          </div>
+          <div style="flex:1">
+            <label>Sleep time</label>
+            <input id="sleepTime" type="time" value="23:00" />
+          </div>
+        </div>
+        <div class="btn-row" style="width:100%">
+          <button id="applyHours" class="secondary">Apply Hours</button>
+          <button id="autoSchedule">Auto‑Schedule Week</button>
+        </div>
+      </div>
+      <div id="schedule" class="sched-grid"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- Helpers ---------- */
+const $ = s => document.querySelector(s);
+const el = (t,p={},...c)=>{const n=document.createElement(t);Object.entries(p).forEach(([k,v])=>k==='class'?n.className=v:k==='html'?n.innerHTML=v:n[k]=v);c.forEach(x=>n.append(x));return n;}
+const uid = ()=>'t_'+Math.random().toString(36).slice(2,9);
+const urgencyWeight = u => ({High:3, Medium:2, Low:1}[u]||0);
+const parseDate = s => s ? new Date(s) : null;
+const fmt = d => d ? new Date(d).toLocaleDateString() : '—';
+const isToday = d => { if(!d) return false; const x=new Date(d), t=new Date(); return x.getFullYear()==t.getFullYear()&&x.getMonth()==t.getMonth()&&x.getDate()==t.getDate(); };
+function weekStart(d){ const dt = new Date(d); const day = dt.getDay(); const diff = dt.getDate() - day + (day===0?-6:1); return new Date(dt.setDate(diff)); } // Monday
+function parseTimeHHMM(v){ if(!v) return {h:9,m:0}; const [h,m]=v.split(':').map(Number); return {h:isNaN(h)?9:h, m:isNaN(m)?0:m}; }
+
+/* ---------- Voice add helpers ---------- */
+// "3 pm", "15:30", "noon" -> "HH:MM"
+function parseClockTime(str){
+  if(!str) return null;
+  const s = str.trim().toLowerCase();
+  if(s==='noon') return '12:00';
+  if(s==='midnight') return '00:00';
+  const m = s.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i);
+  if(!m) return null;
+  let h = parseInt(m[1],10), min = parseInt(m[2]||'0',10), ampm = (m[3]||'').toLowerCase();
+  if(ampm==='pm' && h<12) h+=12;
+  if(ampm==='am' && h===12) h=0;
+  if(!ampm && h===24) h=0;
+  h = Math.max(0, Math.min(23, h));
+  min = Math.max(0, Math.min(59, min));
+  return String(h).padStart(2,'0')+':'+String(min).padStart(2,'0');
+}
+// "2 hours", "90 min" -> hours number
+function parseDurationHours(str){
+  if(!str) return 1;
+  const s = str.trim().toLowerCase();
+  const hm = s.match(/^([\d.]+)\s*(h|hr|hrs|hour|hours)$/);
+  if(hm) return Math.max(0.5, parseFloat(hm[1]));
+  const mm = s.match(/^([\d.]+)\s*(m|min|mins|minute|minutes)$/);
+  if(mm) return Math.max(0.5, parseFloat(mm[1])/60);
+  const just = s.match(/^([\d.]+)$/);
+  if(just) return Math.max(0.5, parseFloat(just[1]));
+  return 1;
+}
+function parseDayIndex(str){
+  if(!str) return null;
+  const days = ['monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+  const idx = days.indexOf(str.trim().toLowerCase());
+  return idx>=0 ? idx : null;
+}
+function addFixedFromVoice(name, dayIdx, clockHHMM, hours){
+  const base = $('#weekDate').value ? weekStart($('#weekDate').value) : weekStart(new Date());
+  const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + (dayIdx ?? 0));
+  const isoDate = d.toISOString().slice(0,10);
+  const fixedDuration = Math.max(0.5, Math.round(hours*2)/2);
+  tasks.push({
+    id: uid(),
+    name: name.trim(),
+    urgency: 'Medium',
+    deadline: isoDate,
+    eta: fixedDuration,
+    status: 'Not Started',
+    type: 'Fixed',
+    fixedDate: isoDate,
+    fixedStart: clockHHMM,
+    fixedDuration
+  });
+  renderBoard(); renderPriority(); buildSchedule();
+}
+
+/* ---------- Data ---------- */
+let tasks = [
+  {id:uid(), name:"Study for Exams", urgency:"High", deadline:"2025-11-10", eta:5, status:"Not Started", type:"Flexible"},
+  {id:uid(), name:"Travel Prep",     urgency:"Medium", deadline:"2025-11-12", eta:3, status:"Not Started", type:"Flexible"},
+  {id:uid(), name:"Take a Walk",     urgency:"Low", deadline:"2025-11-08", eta:1, status:"Not Started", type:"Flexible"},
+  {id:uid(), name:"Project Work",    urgency:"High", deadline:"2025-11-09", eta:4, status:"In Progress", type:"Flexible"},
+  {id:uid(), name:"Team Meeting",    urgency:"High", deadline:"2025-11-08", eta:1, status:"Not Started", type:"Fixed", fixedDate:"2025-11-08", fixedStart:"10:00", fixedDuration:1},
+];
+
+/* ---------- Prioritization ---------- */
+function compareTasks(a,b){
+  const da=parseDate(a.deadline), db=parseDate(b.deadline);
+  if(da && db && da.getTime()!==db.getTime()) return da - db;
+  if(da && !db) return -1; if(!da && db) return 1;
+  return urgencyWeight(b.urgency) - urgencyWeight(a.urgency);
+}
+function prioritized(){ return tasks.filter(t=>t.status!=="Done" && t.type!=="Fixed").slice().sort(compareTasks); }
+
+/* ---------- Board ---------- */
+function urgClass(u){ return u==='High'?'urg-high':u==='Medium'?'urg-medium':'urg-low'; }
+function taskCard(t){
+  const card = el('div',{class:'task', draggable:true}); card.dataset.id = t.id;
+  card.append(
+    el('div',{class:'title', textContent:t.name + (t.type==='Fixed'?' 📌':'')}),
+    el('div',{class:'meta'},
+      el('span',{class:'pill '+urgClass(t.urgency), textContent:t.urgency}),
+      el('span',{class:'pill', textContent:`Deadline: ${fmt(t.deadline)}`}),
+      el('span',{class:'pill', textContent:`ETA: ${t.eta||0}h`}),
+      t.type==='Fixed' ? el('span',{class:'pill', textContent:`Fixed: ${t.fixedDate||'—'} @ ${t.fixedStart||'—'} (${t.fixedDuration||t.eta||1}h)`}) : el('span',{})
+    ),
+    el('div',{class:'actions'},
+      el('button',{class:'secondary', textContent:'Move ▶', onclick:()=>cycleStatus(t.id)}),
+      el('button',{class:'danger', textContent:'Delete', onclick:()=>removeTask(t.id)})
+    )
+  );
+  card.addEventListener('dragstart', e=> e.dataTransfer.setData('text/plain', t.id));
+  return card;
+}
+function renderBoard(){
+  ['notstarted','inprogress','done'].forEach(id=>$('#col-'+id).innerHTML='');
+  tasks.forEach(t=>{
+    const k = t.status==='Not Started'?'notstarted':t.status==='In Progress'?'inprogress':'done';
+    $('#col-'+k).append(taskCard(t));
+  });
+}
+function setupDnD(){
+  document.querySelectorAll('.dropzone').forEach(zone=>{
+    zone.addEventListener('dragover', e=>{e.preventDefault(); zone.style.outline='2px dashed #4b56a1';});
+    zone.addEventListener('dragleave', ()=> zone.style.outline='none');
+    zone.addEventListener('drop', e=>{
+      e.preventDefault(); zone.style.outline='none';
+      const id = e.dataTransfer.getData('text/plain');
+      const status = zone.parentElement.getAttribute('data-status');
+      updateTask(id,{status});
+    });
+  });
+}
+
+/* ---------- Priority UI ---------- */
+function renderPriority(){
+  const list = prioritized(); const top3 = list.slice(0,3);
+  const make = arr => arr.map((t,i)=>el('div',{class:'prio'},
+    el('div',{class:'rank', textContent:'#'+(i+1)}),
+    el('div',{style:'flex:1'},
+      el('div',{style:'font-weight:700'}, t.name),
+      el('div',{style:'font-size:12px; color:#b9c1ff'}, `Deadline: ${fmt(t.deadline)} • Urgency: ${t.urgency} • ETA: ${t.eta||0}h`)
+    ),
+    el('button',{class:'secondary', textContent:'Focus', onclick:()=>addAI(`Focus: “${t.name}” due ${fmt(t.deadline)} (${t.urgency}, ${t.eta||0}h).`)})
+  ));
+  $('#priorityTop').innerHTML=''; make(top3).forEach(n=>$('#priorityTop').append(n));
+  $('#priorityFull').innerHTML=''; make(list).forEach(n=>$('#priorityFull').append(n));
+}
+
+/* ---------- CRUD ---------- */
+function addTask(){
+  const name=$('#name').value.trim();
+  const urgency=$('#urgency').value;
+  const deadline=$('#deadline').value||'';
+  const eta=parseFloat($('#eta').value||'0');
+  const type=$('#type').value;
+  const fixedDate=$('#fixedDate').value||'';
+  const fixedStart=$('#fixedStart').value||'';
+  const fixedDuration=parseFloat($('#fixedDuration').value||eta||1);
+  if(!name) return alert('Enter a task name');
+  const base = {id:uid(), name, urgency, deadline, eta, status:'Not Started', type};
+  if(type==='Fixed') Object.assign(base, {fixedDate, fixedStart, fixedDuration});
+  tasks.push(base);
+  $('#name').value=''; $('#deadline').value=''; $('#eta').value='';
+  $('#fixedDate').value=''; $('#fixedStart').value='10:00'; $('#fixedDuration').value='';
+  renderBoard(); renderPriority(); buildSchedule();
+}
+function updateTask(id, patch){ const t=tasks.find(x=>x.id===id); if(!t) return; Object.assign(t,patch); renderBoard(); renderPriority(); buildSchedule(); }
+function removeTask(id){ tasks = tasks.filter(t=>t.id!==id); renderBoard(); renderPriority(); buildSchedule(); }
+function cycleStatus(id){
+  const t = tasks.find(x=>x.id===id); if(!t) return;
+  const order=['Not Started','In Progress','Done']; t.status = order[(order.indexOf(t.status)+1)%order.length];
+  renderBoard(); renderPriority(); buildSchedule();
+}
+
+/* ---------- Chat + Speech (TTS) ---------- */
+const chat = $('#chatLog');
+const addUser = m => { chat.append(el('div',{class:'bubble user',textContent:m})); chat.scrollTop=chat.scrollHeight; };
+let addAI = function(m){ chat.append(el('div',{class:'bubble ai',textContent:m})); chat.scrollTop=chat.scrollHeight; };
+
+function say(text){
+  try{
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1.0; u.pitch = 1.0; u.lang = 'en-IN';
+    window.speechSynthesis.speak(u);
+  }catch(e){}
+}
+const __origAddAI = addAI;
+addAI = function(msg){ __origAddAI(msg); say(msg); };
+
+/* ---------- Weekly schedule ---------- */
+function hourRange(){ const w=parseTimeHHMM($('#wakeTime').value).h; const s=parseTimeHHMM($('#sleepTime').value).h; return {start:Math.min(w,s-1), end:Math.max(w+1,s)}; }
+function withinWeek(base, date){ return date>=base && date< new Date(base.getFullYear(), base.getMonth(), base.getDate()+7); }
+
+function buildSchedule(){
+  const container = $('#schedule'); container.innerHTML='';
+  container.append(el('div',{class:'sched-header', html:'&nbsp;'}));
+  const base = $('#weekDate').value ? weekStart($('#weekDate').value) : weekStart(new Date());
+  const days = [...Array(7)].map((_,i)=> new Date(base.getFullYear(), base.getMonth(), base.getDate()+i));
+  const labels = days.map(d=> d.toLocaleDateString(undefined,{weekday:'short', month:'short', day:'numeric'}));
+  labels.forEach(lbl=> container.append(el('div',{class:'sched-header', textContent:lbl})));
+
+  const {start, end} = hourRange();
+  for(let h=start; h<end; h++){
+    container.append(el('div',{class:'sched-hour', textContent: String(h).padStart(2,'0')+':00'}));
+    for(let d=0; d<7; d++) container.append(el('div',{class:'slot', id:`slot-${d}-${h}`}));
+  }
+}
+function fillSlot(d,h,t,asFixed=false){
+  const slotEl = document.getElementById(`slot-${d}-${h}`); if(!slotEl) return false;
+  slotEl.classList.add(t.urgency==='High'?'fill-high':t.urgency==='Medium'?'fill-medium':'fill-low');
+  if(asFixed) slotEl.classList.add('fixed');
+  if(!slotEl.querySelector('.badge')) slotEl.append(el('div',{class:'badge', textContent:t.name}));
+  return true;
+}
+function autoSchedule(){
+  buildSchedule();
+  const base = $('#weekDate').value ? weekStart($('#weekDate').value) : weekStart(new Date());
+  const {start, end} = hourRange();
+  const free = {}; for(let d=0; d<7; d++){ free[d]=[]; for(let h=start; h<end; h++) free[d].push(h); }
+
+  // Fixed first
+  const fixed = tasks.filter(t=>t.status!=='Done' && t.type==='Fixed' && t.fixedDate);
+  fixed.sort((a,b)=> new Date(a.fixedDate) - new Date(b.fixedDate));
+  for(const t of fixed){
+    const dayDate = parseDate(t.fixedDate); if(!dayDate || !withinWeek(base, dayDate)) continue;
+    const dIndex = Math.floor((dayDate - base)/86400000);
+    const startH = parseTimeHHMM(t.fixedStart).h;
+    const dur = Math.ceil(+t.fixedDuration || +t.eta || 1);
+    for(let k=0;k<dur;k++){
+      const h = startH + k; if(!free[dIndex] || !free[dIndex].includes(h)) continue;
+      if(h>=start && h<end){ fillSlot(dIndex,h,t,true); free[dIndex] = free[dIndex].filter(x=>x!==h); }
+    }
+  }
+
+  // Flexible next
+  const list = prioritized();
+  for(const t of list){
+    let hours = Math.max(0, Math.round((+t.eta||0)));
+    const due = parseDate(t.deadline);
+    let latestDay = 6; if(due && withinWeek(base,due)) latestDay = Math.floor((due - base)/86400000);
+    for(let d=0; d<=latestDay && hours>0; d++){
+      for(const h of [...free[d]]){
+        if(hours<=0) break;
+        if(fillSlot(d,h,t)){ free[d] = free[d].filter(x=>x!==h); hours--; }
+      }
+    }
+    for(let d=0; d<7 && hours>0; d++){
+      for(const h of [...free[d]]){
+        if(hours<=0) break;
+        if(fillSlot(d,h,t)){ free[d] = free[d].filter(x=>x!==h); hours--; }
+      }
+    }
+  }
+}
+
+/* ---------- Voice input (SpeechRecognition) ---------- */
+const micBtn = document.getElementById('mic');
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null;
+function setupRecognition(){
+  if(!SR){ alert('Voice input not supported in this browser. Try Chrome.'); return; }
+  rec = new SR();
+  rec.lang = 'en-IN'; rec.continuous = false; rec.interimResults = true;
+  rec.onstart = ()=>{ micBtn.classList.add('on'); window.speechSynthesis.cancel(); };
+  rec.onend   = ()=>{ micBtn.classList.remove('on'); };
+  rec.onresult = (ev)=>{
+    const transcript = Array.from(ev.results).map(r=>r[0].transcript).join(' ');
+    document.getElementById('chatInput').value = transcript;
+    if(ev.results[ev.results.length-1].isFinal){
+      const finalText = transcript.trim();
+      if(finalText){
+        addUser(finalText);
+        document.getElement
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI Task Assistant • Weekly Schedule • Voice Add</title>
+<style>
+/* styles unchanged from previous version (keep your existing styles) */
+</style>
+</head>
+<body>
+<!-- keep your existing HTML layout exactly as before, including the mic button id="mic" -->
+<!-- ... for brevity, reuse your last working markup ... -->
+
+<script>
+/* keep all your helpers, data, board, schedule, and TTS code as before */
+
+/* === FIXED/COMPLETED RECOGNITION WIRING === */
+const micBtn = document.getElementById('mic');
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null;
+
+function setupRecognition(){
+  if(!SR){ alert('Voice input not supported in this browser. Try Chrome.'); return; }
+  rec = new SR();
+  rec.lang = 'en-IN';
+  rec.continuous = false;
+  rec.interimResults = true;
+
+  rec.onstart = ()=>{ micBtn.classList.add('on'); window.speechSynthesis.cancel(); };
+  rec.onend   = ()=>{ micBtn.classList.remove('on'); };
+  rec.onerror = ()=>{ micBtn.classList.remove('on'); };
+
+  rec.onresult = (ev)=>{
+    // Build transcript from interim + final
+    const transcript = Array.from(ev.results).map(r=>r[0].transcript).join(' ');
+    const input = document.getElementById('chatInput');
+    input.value = transcript;
+
+    // When the last result is final, submit it
+    const last = ev.results[ev.results.length-1];
+    if(last && last.isFinal){
+      const finalText = transcript.trim();
+      if(finalText){
+        addUser(finalText);
+        input.value = '';
+        handleQuery(finalText);  // your enhanced parser handles: Add task NAME at TIME for DURATION on DAY
+      }
+      try{ rec.stop(); }catch(e){}
+    }
+  };
+}
+
+micBtn.addEventListener('click', ()=>{
+  if(!rec) setupRecognition();
+  if(!rec) return;
+  try{
+    if(micBtn.classList.contains('on')) rec.stop();
+    else rec.start();  // must be triggered by a user gesture in a secure context
+  }catch(e){
+    micBtn.classList.remove('on');
+  }
+});
+</script>
+</body>
+</html>
+
